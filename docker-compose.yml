@@ -1,0 +1,47 @@
+version: "3.8"
+
+services:
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: absconding-n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=admin
+      - N8N_BASIC_AUTH_PASSWORD=admin123 # Change this!
+      - N8N_HOST=localhost
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - WEBHOOK_URL=http://host.docker.internal:5678/
+      # Enable external secrets for Flask API
+      - GENERIC_TIMEZONE=Asia/Kolkata
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./n8n-workflows:/home/node/.n8n/workflows
+    networks:
+      - absconding-network
+
+  # Optional: PostgreSQL for n8n (for production)
+  # Uncomment if you want persistent workflow history
+  # postgres:
+  #   image: postgres:15-alpine
+  #   container_name: absconding-postgres
+  #   restart: unless-stopped
+  #   environment:
+  #     - POSTGRES_USER=n8n
+  #     - POSTGRES_PASSWORD=n8n_password
+  #     - POSTGRES_DB=n8n
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   networks:
+  #     - absconding-network
+
+volumes:
+  n8n_data:
+  # postgres_data:
+
+networks:
+  absconding-network:
+    driver: bridge
