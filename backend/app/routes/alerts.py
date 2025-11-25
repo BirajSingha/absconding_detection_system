@@ -5,6 +5,7 @@ from app.services.sentiment_analyzer import SentimentAnalyzer
 from app.services.rag_service import get_rag_service
 from app.services.vector_store import get_vector_store
 from app.services.slack_service import get_slack_service
+from app.services.email_service import get_email_service
 from app import db
 import uuid
 
@@ -16,6 +17,7 @@ sentiment_analyzer = SentimentAnalyzer()
 rag_service = get_rag_service()
 vector_store = get_vector_store()
 slack_service = get_slack_service()
+email_service = get_email_service()
 
 @bp.route('', methods=['GET'])
 def list_alerts():
@@ -127,9 +129,19 @@ def analyze_employee(employee_id):
         db.session.add(alert)
         db.session.commit()
         
-        # TRIGGER: Send Slack notification for high risk alerts
+        # TRIGGER: Send multi-channel notifications for high risk alerts
         if risk_level in ['HIGH', 'CRITICAL']:
+            # Send Slack notification
             slack_service.send_high_risk_alert(
+                employee=employee,
+                risk_score=final_risk_score,
+                risk_level=risk_level,
+                anomalies=anomalies,
+                sentiment_data=sentiment_data
+            )
+            
+            # Send Email notification
+            email_service.send_high_risk_alert(
                 employee=employee,
                 risk_score=final_risk_score,
                 risk_level=risk_level,
