@@ -29,8 +29,8 @@ docker-compose up -d
 
 n8n will run on: http://localhost:5678
 
-- **Username**: admin
-- **Password**: admin123 (change this!)
+- **Username**: biraj.singha@intglobal.com
+- **Password**: Biraj.INT@123
 
 ### 3. Start MCP Server (Optional)
 
