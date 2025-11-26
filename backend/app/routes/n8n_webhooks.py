@@ -164,3 +164,28 @@ def get_high_risk_employees():
         'count': len(result),
         'employees': result
     })
+
+@bp.route('/lookup-by-email', methods=['GET'])
+def lookup_by_email():
+    """
+    Helper endpoint for n8n to find an employee by email address.
+    Query param: ?email=john@example.com
+    """
+    email = request.args.get('email')
+    if not email:
+        return jsonify({'error': 'Email parameter is required'}), 400
+        
+    # Case-insensitive search
+    employee = Employee.query.filter(Employee.email.ilike(email)).first()
+    
+    if not employee:
+        return jsonify({'error': 'Employee not found', 'found': False}), 404
+        
+    return jsonify({
+        'found': True,
+        'employee_id': employee.employee_id,
+        'name': employee.name,
+        'email': employee.email,
+        'department': employee.department,
+        'role': employee.role
+    })

@@ -32,6 +32,11 @@ class Employee(db.Model):
     communications = db.relationship('Communication', backref='employee', lazy=True, cascade='all, delete-orphan')
     
     def to_dict(self):
+        # Get latest alert for risk score
+        latest_alert = None
+        if self.alerts:
+            latest_alert = max(self.alerts, key=lambda a: a.created_at)
+            
         return {
             'id': self.id,
             'employee_id': self.employee_id,
@@ -47,6 +52,8 @@ class Employee(db.Model):
             'productivity_score': self.productivity_score,
             'attendance_percentage': self.attendance_percentage,
             'performance_rating': self.performance_rating,
+            'risk_score': latest_alert.risk_score if latest_alert else 0,
+            'risk_level': latest_alert.risk_level if latest_alert else 'LOW',
             'created_at': self.created_at.isoformat(),
             'updated_at': self.updated_at.isoformat()
         }
