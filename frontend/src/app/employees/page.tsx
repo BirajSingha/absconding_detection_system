@@ -37,25 +37,25 @@ export default function EmployeesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col justify-between space-y-4 sm:flex-row sm:items-center sm:space-y-0">
+      <div className="flex flex-col justify-between space-y-4 md:flex-row md:items-center md:space-y-0">
         <h1 className="text-2xl font-bold text-slate-900">Employees</h1>
 
-        <div className="flex space-x-4">
-          <div className="relative">
+        <div className="flex w-full flex-col space-y-4 md:w-auto md:flex-row md:space-x-4 md:space-y-0">
+          <div className="relative w-full md:w-64">
             <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
               placeholder="Search employees..."
-              className="h-10 rounded-md border border-slate-300 pl-10 pr-4 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              className="h-10 w-full rounded-md border border-slate-300 pl-10 pr-4 text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
 
-          <div className="relative">
+          <div className="relative w-full md:w-48">
             <Filter className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
             <select
-              className="h-10 rounded-md border border-slate-300 pl-10 pr-8 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              className="h-10 w-full rounded-md border border-slate-300 pl-10 pr-8 text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
             >
