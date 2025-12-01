@@ -10,7 +10,7 @@ class AnomalyDetector:
         self.attendance_threshold = 20    # % drop that triggers alert
         self.communication_threshold = 40  # % reduction in communications
     
-    def detect_anomalies(self, employee_id):
+    def detect_anomalies(self, employee_id, timeframe_days=30):
         """
         Detect behavioral anomalies for an employee.
         Returns list of detected anomalies with severity scores.
@@ -42,7 +42,7 @@ class AnomalyDetector:
             })
         
         # 3. Check communication patterns
-        comm_anomaly = self._detect_communication_anomaly(employee_id)
+        comm_anomaly = self._detect_communication_anomaly(employee_id, timeframe_days)
         if comm_anomaly:
             anomalies.append(comm_anomaly)
         
@@ -78,17 +78,17 @@ class AnomalyDetector:
         severity = min(abs(percentage_drop), max_severity)
         return round(severity, 2)
     
-    def _detect_communication_anomaly(self, employee_id):
+    def _detect_communication_anomaly(self, employee_id, timeframe_days=30):
         """
         Detect changes in communication patterns.
         Returns anomaly if communication frequency drops significantly.
         """
-        # Get communication history for last 30 days
-        thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+        # Get communication history for last X days
+        start_date = datetime.utcnow() - timedelta(days=timeframe_days)
         
         communications = Communication.query.filter(
             Communication.employee_id == employee_id,
-            Communication.created_at >= thirty_days_ago
+            Communication.created_at >= start_date
         ).all()
         
         if len(communications) < 2:
@@ -107,7 +107,7 @@ class AnomalyDetector:
                 'type': 'negative_sentiment_pattern',
                 'severity': negative_sentiment_count / len(recent_comms),
                 'value': f'{negative_sentiment_count}/{len(recent_comms)} recent messages negative',
-                'description': f'{negative_sentiment_count} out of {len(recent_comms)} recent communications show negative sentiment'
+                'description': f'{negative_sentiment_count} out of {len(recent_comms)} recent communications show negative sentiment (last {timeframe_days} days)'
             }
         
         return None

@@ -5,6 +5,7 @@ from app.services.sentiment_analyzer import SentimentAnalyzer
 from app import db
 import hmac
 import hashlib
+from datetime import datetime
 
 bp = Blueprint('n8n_webhooks', __name__, url_prefix='/api/webhooks/n8n')
 
@@ -36,7 +37,8 @@ def trigger_analysis():
     {
         "employee_id": "EMP001",
         "communications": [...],
-        "notify": true
+        "notify": true,
+        "timeframe_days": 30
     }
     """
     data = request.json
@@ -50,8 +52,23 @@ def trigger_analysis():
     if not employee:
         return jsonify({'error': 'Employee not found'}), 404
     
+    # Check tenure (must be at least 30 days)
+    days_active = (datetime.utcnow() - employee.created_at).days
+    if days_active < 30:
+        return jsonify({
+            'employee_id': employee_id,
+            'employee_name': employee.name,
+            'risk_score': 0,
+            'risk_level': 'LOW',
+            'anomalies': [],
+            'sentiment': None,
+            'should_alert': False,
+            'message': f'Employee has only been active for {days_active} days. Minimum 30 days required for analysis.'
+        })
+
     # Perform analysis
-    anomalies = anomaly_detector.detect_anomalies(employee_id)
+    timeframe_days = data.get('timeframe_days', 30)
+    anomalies = anomaly_detector.detect_anomalies(employee_id, timeframe_days)
     communications = data.get('communications', [])
     sentiment_data = sentiment_analyzer.analyze_communications(communications)
     
@@ -76,7 +93,8 @@ def trigger_analysis():
         'risk_level': risk_level,
         'anomalies': anomalies,
         'sentiment': sentiment_data,
-        'should_alert': risk_level in ['HIGH', 'CRITICAL']
+        'should_alert': risk_level in ['HIGH', 'CRITICAL'],
+        'timeframe_days': timeframe_days
     })
 
 @bp.route('/batch-analysis', methods=['POST'])
@@ -86,10 +104,27 @@ def batch_analysis():
     Returns list of employees with risk scores.
     """
     employees = Employee.query.filter_by(employment_status='ACTIVE').all()
+    data = request.json or {}
+    timeframe_days = data.get('timeframe_days', 30)
     
     results = []
     for employee in employees:
-        anomalies = anomaly_detector.detect_anomalies(employee.employee_id)
+        # Check tenure
+        days_active = (datetime.utcnow() - employee.created_at).days
+        if days_active < 30:
+            results.append({
+                'employee_id': employee.employee_id,
+                'name': employee.name,
+                'department': employee.department,
+                'risk_score': 0,
+                'risk_level': 'LOW',
+                'anomaly_count': 0,
+                'status': 'SKIPPED_TENURE',
+                'days_active': days_active
+            })
+            continue
+
+        anomalies = anomaly_detector.detect_anomalies(employee.employee_id, timeframe_days)
         risk_score = anomaly_detector.calculate_risk_score(anomalies)
         
         if risk_score >= 80:
@@ -116,7 +151,8 @@ def batch_analysis():
     return jsonify({
         'total_employees': len(results),
         'high_risk_count': sum(1 for r in results if r['risk_level'] in ['HIGH', 'CRITICAL']),
-        'employees': results
+        'employees': results,
+        'timeframe_days': timeframe_days
     })
 
 @bp.route('/alert-created', methods=['POST'])
