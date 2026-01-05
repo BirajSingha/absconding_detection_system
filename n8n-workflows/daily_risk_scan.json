@@ -1,0 +1,137 @@
+{
+  "name": "Daily Candidate Risk Scan",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * *"
+            }
+          ]
+        }
+      },
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "notes": "Triggers the workflow every day at 9:00 AM."
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://host.docker.internal:5000/api/webhooks/n8n/get-candidates-for-review",
+        "options": {}
+      },
+      "name": "Fetch High Risk Candidates",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [450, 300],
+      "notes": "Queries the backend for candidates flagged with high absconding risk (LOW fit score)."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.count }}",
+              "operation": "larger",
+              "value2": 0
+            }
+          ]
+        }
+      },
+      "name": "Check Risk Count",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [650, 300],
+      "notes": "Checks if any high-risk candidates were returned."
+    },
+    {
+      "parameters": {
+        "jsCode": "const candidates = $input.first().json.candidates || [];\n\nreturn [\n  {\n    json: {\n      subject: `🚨 Daily Risk Alert: ${candidates.length} High Risk Candidates Detected`,\n      message:\n        `<h3>Daily Candidate Risk Scan Results</h3>` +\n        `<p>Found <b>${candidates.length}</b> high-risk candidates requiring review:</p><ul>` +\n        candidates\n          .map(\n            (c) =>\n              `<li><b>${c.name}</b> (${c.position}): Fit Score ${c.fit_score.toFixed(1)} - ${c.fit_category} [${c.alert_reason}]</li>`\n          )\n          .join(\"\") + \"</ul>\",\n    },\n  },\n];"
+      },
+      "name": "Format Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [850, 200],
+      "notes": "Formats the raw JSON data into a readable HTML email message."
+    },
+    {
+      "parameters": {
+        "fromEmail": "admin@company.com",
+        "toEmail": "hr@company.com",
+        "subject": "={{ $json.subject }}",
+        "html": "={{ $json.message }}",
+        "options": {}
+      },
+      "name": "Send Email Alert",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [1050, 200],
+      "notes": "Sends the formatted alert to the HR team."
+    },
+    {
+      "parameters": {},
+      "name": "No Risks Found",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [850, 400],
+      "notes": "No action taken if no high-risk candidates are found."
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Fetch High Risk Candidates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch High Risk Candidates": {
+      "main": [
+        [
+          {
+            "node": "Check Risk Count",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Risk Count": {
+      "main": [
+        [
+          {
+            "node": "Format Email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Risks Found",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Email": {
+      "main": [
+        [
+          {
+            "node": "Send Email Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

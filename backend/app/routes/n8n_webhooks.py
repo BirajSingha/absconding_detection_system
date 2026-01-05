@@ -1,7 +1,6 @@
 from flask import Blueprint, request, jsonify
-from app.models.employee import Employee, Alert
-from app.services.anomaly_detector import AnomalyDetector
-from app.services.sentiment_analyzer import SentimentAnalyzer
+from app.models.candidate import Candidate, InterviewAnalysis
+from app.services.llm_analyzer import LLMAnalyzer
 from app import db
 import hmac
 import hashlib
@@ -9,8 +8,7 @@ from datetime import datetime
 
 bp = Blueprint('n8n_webhooks', __name__, url_prefix='/api/webhooks/n8n')
 
-anomaly_detector = AnomalyDetector()
-sentiment_analyzer = SentimentAnalyzer()
+llm_analyzer = LLMAnalyzer()
 
 # Webhook secret for security (optional but recommended)
 WEBHOOK_SECRET = "n8n_webhook_secret_key"  # Should be in .env
@@ -28,200 +26,101 @@ def verify_webhook_signature(data, signature):
     
     return hmac.compare_digest(signature, expected_signature)
 
-@bp.route('/trigger-analysis', methods=['POST'])
-def trigger_analysis():
+@bp.route('/analyze-candidate', methods=['POST'])
+def analyze_candidate():
     """
-    Webhook endpoint for n8n to trigger employee analysis.
+    Webhook endpoint for n8n to trigger candidate analysis.
     
     Expected payload:
     {
-        "employee_id": "EMP001",
-        "communications": [...],
-        "notify": true,
-        "timeframe_days": 30
+        "candidate_id": "CAND123",
+        "transcript_text": "...",
+        "position": "Software Engineer"
     }
     """
     data = request.json
     
-    if not data or 'employee_id' not in data:
-        return jsonify({'error': 'employee_id is required'}), 400
+    if not data or 'candidate_id' not in data:
+        return jsonify({'error': 'candidate_id is required'}), 400
     
-    employee_id = data['employee_id']
-    employee = Employee.query.filter_by(employee_id=employee_id).first()
+    candidate_id = data['candidate_id']
+    candidate = Candidate.query.filter_by(candidate_id=candidate_id).first()
     
-    if not employee:
-        return jsonify({'error': 'Employee not found'}), 404
-    
-    # Check tenure (must be at least 30 days)
-    days_active = (datetime.utcnow() - employee.created_at).days
-    if days_active < 30:
-        return jsonify({
-            'employee_id': employee_id,
-            'employee_name': employee.name,
-            'risk_score': 0,
-            'risk_level': 'LOW',
-            'anomalies': [],
-            'sentiment': None,
-            'should_alert': False,
-            'message': f'Employee has only been active for {days_active} days. Minimum 30 days required for analysis.'
-        })
+    if not candidate:
+        return jsonify({'error': 'Candidate not found'}), 404
 
-    # Perform analysis
-    timeframe_days = data.get('timeframe_days', 30)
-    anomalies = anomaly_detector.detect_anomalies(employee_id, timeframe_days)
-    communications = data.get('communications', [])
-    sentiment_data = sentiment_analyzer.analyze_communications(communications)
+    # Perform Analysis
+    transcript_text = data.get('transcript_text', '')
+    position = data.get('position', candidate.position_applied)
     
-    risk_score = anomaly_detector.calculate_risk_score(anomalies)
-    if sentiment_data:
-        risk_score = (risk_score + sentiment_data['exit_intent_score']) / 2
+    analysis_result = llm_analyzer.analyze_transcript(transcript_text, position)
     
-    # Determine risk level
-    if risk_score >= 80:
-        risk_level = 'CRITICAL'
-    elif risk_score >= 60:
-        risk_level = 'HIGH'
-    elif risk_score >= 40:
-        risk_level = 'MEDIUM'
-    else:
-        risk_level = 'LOW'
+    # Check for Alert Conditions (Low fit or specific sentiment flags)
+    should_alert = False
+    alert_reason = []
+    
+    if analysis_result['fit_category'] == 'LOW':
+        should_alert = True
+        alert_reason.append("Low Fit Score")
+        
+    tone = analysis_result.get('tone_analysis', {})
+    if tone.get('nervousness', 0) > 8:
+        should_alert = True
+        alert_reason.append("High Nervousness Detected")
+        
+    # Save analysis to DB
+    analysis = InterviewAnalysis(
+        candidate_id=candidate.candidate_id,
+        fit_score=analysis_result['fit_score'],
+        fit_category=analysis_result['fit_category'],
+        confidence_score=analysis_result['confidence_score'],
+        tone_analysis=analysis_result['tone_analysis'],
+        behavioral_traits=analysis_result['behavioral_traits'],
+        ai_summary=analysis_result['ai_summary'],
+        recommendations=analysis_result['recommendations']
+    )
+    db.session.add(analysis)
+    
+    # Update candidate status
+    candidate.status = 'INTERVIEWED'
+    db.session.commit()
     
     return jsonify({
-        'employee_id': employee_id,
-        'employee_name': employee.name,
-        'risk_score': risk_score,
-        'risk_level': risk_level,
-        'anomalies': anomalies,
-        'sentiment': sentiment_data,
-        'should_alert': risk_level in ['HIGH', 'CRITICAL'],
-        'timeframe_days': timeframe_days
+        'candidate_id': candidate_id,
+        'candidate_name': candidate.name,
+        'fit_score': analysis_result['fit_score'],
+        'fit_category': analysis_result['fit_category'],
+        'tone_analysis': analysis_result['tone_analysis'],
+        'should_alert_hr': should_alert,
+        'alert_reason': ", ".join(alert_reason),
+        'summary': analysis_result['ai_summary']
     })
 
-@bp.route('/batch-analysis', methods=['POST'])
-def batch_analysis():
+@bp.route('/get-candidates-for-review', methods=['GET'])
+def get_candidates_for_review():
     """
-    Webhook for n8n to trigger batch analysis of all employees.
-    Returns list of employees with risk scores.
+    Endpoint for n8n to fetch candidates that need manual HR review.
     """
-    employees = Employee.query.filter_by(employment_status='ACTIVE').all()
-    data = request.json or {}
-    timeframe_days = data.get('timeframe_days', 30)
+    # Fetch candidates interviewed but not yet hired/rejected
+    # OR fetch recent analyses with alerts
     
     results = []
-    for employee in employees:
-        # Check tenure
-        days_active = (datetime.utcnow() - employee.created_at).days
-        if days_active < 30:
+    # Get recent analyses with LOW category
+    analyses = InterviewAnalysis.query.filter_by(fit_category='LOW').order_by(InterviewAnalysis.created_at.desc()).limit(10).all()
+    
+    for analysis in analyses:
+        cand = Candidate.query.filter_by(candidate_id=analysis.candidate_id).first()
+        if cand:
             results.append({
-                'employee_id': employee.employee_id,
-                'name': employee.name,
-                'department': employee.department,
-                'risk_score': 0,
-                'risk_level': 'LOW',
-                'anomaly_count': 0,
-                'status': 'SKIPPED_TENURE',
-                'days_active': days_active
+                'candidate_id': cand.candidate_id,
+                'name': cand.name,
+                'position': cand.position_applied,
+                'fit_score': analysis.fit_score,
+                'fit_category': analysis.fit_category,
+                'alert_reason': 'Low Fit Score' # Simplified for now
             })
-            continue
-
-        anomalies = anomaly_detector.detect_anomalies(employee.employee_id, timeframe_days)
-        risk_score = anomaly_detector.calculate_risk_score(anomalies)
-        
-        if risk_score >= 80:
-            risk_level = 'CRITICAL'
-        elif risk_score >= 60:
-            risk_level = 'HIGH'
-        elif risk_score >= 40:
-            risk_level = 'MEDIUM'
-        else:
-            risk_level = 'LOW'
-        
-        results.append({
-            'employee_id': employee.employee_id,
-            'name': employee.name,
-            'department': employee.department,
-            'risk_score': risk_score,
-            'risk_level': risk_level,
-            'anomaly_count': len(anomalies)
-        })
-    
-    # Sort by risk score descending
-    results.sort(key=lambda x: x['risk_score'], reverse=True)
-    
+            
     return jsonify({
-        'total_employees': len(results),
-        'high_risk_count': sum(1 for r in results if r['risk_level'] in ['HIGH', 'CRITICAL']),
-        'employees': results,
-        'timeframe_days': timeframe_days
-    })
-
-@bp.route('/alert-created', methods=['POST'])
-def alert_created():
-    """
-    Webhook to receive notifications from n8n when alert workflow completes.
-    Can be used for tracking workflow status.
-    """
-    data = request.json
-    
-    # Log the workflow completion
-    print(f"n8n workflow completed: {data}")
-    
-    return jsonify({
-        'status': 'received',
-        'message': 'Workflow notification received'
-    })
-
-@bp.route('/get-high-risk', methods=['GET'])
-def get_high_risk_employees():
-    """
-    Simple endpoint for n8n to fetch current high-risk employees.
-    No POST data required.
-    """
-    alerts = Alert.query.filter(
-        Alert.risk_level.in_(['HIGH', 'CRITICAL']),
-        Alert.status.in_(['OPEN', 'ACKNOWLEDGED'])
-    ).order_by(Alert.risk_score.desc()).limit(20).all()
-    
-    result = []
-    for alert in alerts:
-        employee = Employee.query.filter_by(employee_id=alert.employee_id).first()
-        if employee:
-            result.append({
-                'alert_id': alert.id,
-                'employee_id': employee.employee_id,
-                'employee_name': employee.name,
-                'department': employee.department,
-                'risk_score': alert.risk_score,
-                'risk_level': alert.risk_level,
-                'created_at': alert.created_at.isoformat()
-            })
-    
-    return jsonify({
-        'count': len(result),
-        'employees': result
-    })
-
-@bp.route('/lookup-by-email', methods=['GET'])
-def lookup_by_email():
-    """
-    Helper endpoint for n8n to find an employee by email address.
-    Query param: ?email=john@example.com
-    """
-    email = request.args.get('email')
-    if not email:
-        return jsonify({'error': 'Email parameter is required'}), 400
-        
-    # Case-insensitive search
-    employee = Employee.query.filter(Employee.email.ilike(email)).first()
-    
-    if not employee:
-        return jsonify({'error': 'Employee not found', 'found': False}), 404
-        
-    return jsonify({
-        'found': True,
-        'employee_id': employee.employee_id,
-        'name': employee.name,
-        'email': employee.email,
-        'department': employee.department,
-        'role': employee.role
+        'count': len(results),
+        'candidates': results
     })

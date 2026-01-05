@@ -1,4 +1,4 @@
-import anthropic
+from google import genai
 import os
 from app.services.vector_store import get_vector_store
 import json
@@ -7,9 +7,9 @@ class RAGService:
     """RAG Service using Vector Database for context retrieval"""
     
     def __init__(self):
-        self.client = anthropic.Anthropic(
-            api_key=os.getenv('ANTHROPIC_API_KEY')
-        )
+        api_key = os.getenv('GEMINI_API_KEY')
+        self.client = genai.Client(api_key=api_key)
+        self.model_name = 'gemini-2.0-flash-lite-preview-02-05'
         self.vector_store = get_vector_store()
     
     def analyze_risk(self, employee_data, anomalies, sentiment_data):
@@ -50,16 +50,11 @@ class RAGService:
         
         # 6. Get AI analysis
         try:
-            message = self.client.messages.create(
-                model="claude-sonnet-4-5-20250929",
-                max_tokens=2048,
-                messages=[{
-                    "role": "user",
-                    "content": prompt
-                }]
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=prompt
             )
-            
-            response_text = message.content[0].text
+            response_text = response.text
             
             # Extract JSON from response
             if '```json' in response_text:

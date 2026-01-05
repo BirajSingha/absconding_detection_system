@@ -1,0 +1,43 @@
+{
+  "name": "HR Alert High Risk",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "hr-alert",
+        "options": {}
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "webhookId": "hr-alert"
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{$env.SENDER_EMAIL}}",
+        "toEmail": "={{$env.HR_TEAM_EMAILS}}",
+        "subject": "🚨 High Risk Alert: {{$json.candidate_name}}",
+        "html": "<h3>Absconding Risk Alert</h3><p><b>Candidate:</b> {{$json.candidate_name}} ({{$json.candidate_id}})</p><p><b>Risk Level:</b> <span style=\"color:red\">{{$json.risk_level}}</span></p><p><b>Summary:</b><br>{{$json.summary}}</p>",
+        "options": {}
+      },
+      "name": "Send Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [450, 300]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Send Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

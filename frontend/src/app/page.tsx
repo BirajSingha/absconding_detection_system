@@ -2,18 +2,46 @@
 
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import { Alert, AnalyticsData, AlertSummary } from "@/lib/types";
-import { AlertCard } from "@/components/dashboard/AlertCard";
+import { AnalyticsData, AlertSummary } from "@/lib/types";
+import { InterviewCard } from "@/components/dashboard/InterviewCard";
 import { RiskDistribution } from "@/components/charts/RiskDistribution";
-import { Users, AlertTriangle, TrendingUp, Activity } from "lucide-react";
+import Link from "next/link";
+import { useHeader } from "@/context/HeaderContext";
+import {
+  Users,
+  AlertTriangle,
+  TrendingUp,
+  Activity,
+  Video,
+} from "lucide-react";
 
 export default function Dashboard() {
+  const { setHeaderContent } = useHeader();
   const [stats, setStats] = useState<AnalyticsData | null>(null);
   const [summary, setSummary] = useState<AlertSummary | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    setHeaderContent(
+      <div className="flex justify-between items-center w-full">
+        <h2 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-cyan-600">
+          Recruitment Dashboard
+        </h2>
+        <Link
+          href="/interview"
+          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md transition-colors font-medium text-sm"
+        >
+          <Video className="w-4 h-4" />
+          <span>Start New Interview</span>
+        </Link>
+      </div>
+    );
+    return () => setHeaderContent(null);
+  }, [setHeaderContent]);
+
+  useEffect(() => {
     const loadData = async () => {
+      // ... rest of loadData logic
       try {
         const [dashboardData, summaryData] = await Promise.all([
           api.analytics.getDashboardStats().catch(() => null),
@@ -47,31 +75,33 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
+      {/* Header moved to Portal */}
+
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
-          title="Total Employees"
-          value={summary?.total_employees.toString() || "0"}
+          title="Total Candidates"
+          value={summary?.total_candidates?.toString() || "0"}
           icon={Users}
           trend={`${
-            summary?.trends?.employees && summary.trends.employees > 0
+            summary?.trends?.candidates && summary.trends.candidates > 0
               ? "+"
               : ""
-          }${summary?.trends?.employees || 0}%`}
-          trendUp={(summary?.trends?.employees || 0) >= 0}
+          }${summary?.trends?.candidates || 0}%`}
+          trendUp={(summary?.trends?.candidates || 0) >= 0}
         />
         <StatCard
-          title="At Risk Employees"
-          value={summary?.open_alerts.toString() || "0"}
+          title="Pending Interviews"
+          value={summary?.pending_interviews?.toString() || "0"}
           icon={AlertTriangle}
           trend={`${
             summary?.trends?.at_risk && summary.trends.at_risk > 0 ? "+" : ""
           }${summary?.trends?.at_risk || 0}%`}
-          trendUp={(summary?.trends?.at_risk || 0) <= 0} // Lower is better for risk
-          alert={summary?.open_alerts && summary.open_alerts > 0}
+          trendUp={false} // Pending is just pending, neutral
+          alert={(summary?.pending_interviews || 0) > 10}
         />
         <StatCard
-          title="Resolved Alerts"
-          value={summary?.resolved_alerts.toString() || "0"}
+          title="Completed Interviews"
+          value={summary?.completed_interviews?.toString() || "0"}
           icon={Activity}
           trend={`${
             summary?.trends?.resolved && summary.trends.resolved > 0 ? "+" : ""
@@ -79,33 +109,33 @@ export default function Dashboard() {
           trendUp={(summary?.trends?.resolved || 0) >= 0}
         />
         <StatCard
-          title="Avg Risk Score"
-          value={summary?.average_risk_score.toFixed(1) || "0"}
+          title="Avg Fit Score"
+          value={summary?.average_fit_score?.toFixed(1) || "0"}
           icon={TrendingUp}
           trend={`${
-            summary?.trends?.risk_score && summary.trends.risk_score > 0
+            summary?.trends?.fit_score && summary.trends.fit_score > 0
               ? "+"
               : ""
-          }${summary?.trends?.risk_score || 0}%`}
-          trendUp={(summary?.trends?.risk_score || 0) <= 0} // Lower is better for risk score
+          }${summary?.trends?.fit_score || 0}%`}
+          trendUp={(summary?.trends?.fit_score || 0) >= 0}
         />
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
           <h3 className="mb-4 text-lg font-semibold text-slate-900">
-            Risk Distribution
+            Fit Distribution
           </h3>
           {stats && <RiskDistribution data={stats.risk_distribution} />}
         </div>
 
         <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
           <h3 className="mb-4 text-lg font-semibold text-slate-900">
-            Recent High Risk Alerts
+            Recent Analysis
           </h3>
-          <div className="space-y-4">
-            {stats?.recent_alerts.map((alert) => (
-              <AlertCard key={alert.id} alert={alert} />
+          <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
+            {stats?.recent_alerts.map((analysis) => (
+              <InterviewCard key={analysis.id} analysis={analysis} />
             ))}
           </div>
         </div>
@@ -114,7 +144,23 @@ export default function Dashboard() {
   );
 }
 
-function StatCard({ title, value, icon: Icon, trend, trendUp, alert }: any) {
+interface StatCardProps {
+  title: string;
+  value: string;
+  icon: React.ElementType; // Lucide icon type
+  trend: string;
+  trendUp: boolean;
+  alert?: boolean;
+}
+
+function StatCard({
+  title,
+  value,
+  icon: Icon,
+  trend,
+  trendUp,
+  alert,
+}: StatCardProps) {
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
       <div className="flex items-center justify-between">
@@ -122,7 +168,7 @@ function StatCard({ title, value, icon: Icon, trend, trendUp, alert }: any) {
           <p className="text-sm font-medium text-slate-500">{title}</p>
           <p
             className={`mt-2 text-3xl font-bold ${
-              alert ? "text-red-600" : "text-slate-900"
+              alert ? "text-amber-600" : "text-slate-900"
             }`}
           >
             {value}
@@ -130,14 +176,16 @@ function StatCard({ title, value, icon: Icon, trend, trendUp, alert }: any) {
         </div>
         <div
           className={`rounded-full p-3 ${
-            alert ? "bg-red-50 text-red-600" : "bg-indigo-50 text-indigo-600"
+            alert
+              ? "bg-amber-50 text-amber-600"
+              : "bg-indigo-50 text-indigo-600"
           }`}
         >
           <Icon className="h-6 w-6" />
         </div>
       </div>
       <div className="mt-4 flex items-center text-sm">
-        <span className={trendUp ? "text-green-600" : "text-red-600"}>
+        <span className={trendUp ? "text-green-600" : "text-slate-500"}>
           {trend}
         </span>
         <span className="ml-2 text-slate-500">from last month</span>

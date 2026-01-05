@@ -2,19 +2,20 @@
 
 import { cn } from "@/lib/utils";
 
-interface RiskMeterProps {
+interface FitMeterProps {
   score: number;
   size?: "sm" | "md" | "lg";
 }
 
-export function RiskMeter({ score, size = "md" }: RiskMeterProps) {
+export function FitMeter({ score, size = "md" }: FitMeterProps) {
   const percentage = Math.min(Math.max(score, 0), 100);
 
+  // Higher score is better for Fit Score
   const getColor = (s: number) => {
-    if (s >= 80) return "text-red-600";
-    if (s >= 60) return "text-orange-500";
+    if (s >= 80) return "text-green-600";
+    if (s >= 60) return "text-green-500";
     if (s >= 40) return "text-yellow-500";
-    return "text-green-500";
+    return "text-red-500";
   };
 
   const sizes = {

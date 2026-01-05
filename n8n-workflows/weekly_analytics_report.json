@@ -1,0 +1,91 @@
+{
+  "name": "Weekly HR Analytics Report",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * 1"
+            }
+          ]
+        }
+      },
+      "name": "Weekly Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "notes": "Triggers every Monday at 9:00 AM"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://host.docker.internal:5000/api/analytics/dashboard",
+        "options": {}
+      },
+      "name": "Fetch Dashboard Stats",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [450, 300],
+      "notes": "Fetches aggregated risk distribution and department stats"
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\n\n// Format Risk Distribution\nconst riskDist = data.risk_distribution.map(d => `<li><b>${d.name}</b>: ${d.value}</li>`).join('');\n\n// Format Department Stats\nconst deptStats = data.department_risk.map(d => `<li><b>${d.name}</b>: ${d.high_risk_count} candidates</li>`).join('');\n\n// Format Recent Alerts\nconst recent = data.recent_alerts.slice(0, 5).map(a => `<li>Fit Score: ${a.fit_score} (${a.fit_category}) - ${a.alert_reason || 'N/A'}</li>`).join('');\n\nconst message = `\n<h3>Weekly HR Analytics Report</h3>\n<h4>Risk Distribution</h4>\n<ul>${riskDist}</ul>\n<h4>Department Breakdown</h4>\n<ul>${deptStats}</ul>\n<h4>Recent Analysis Activity</h4>\n<ul>${recent}</ul>\n`;\n\nreturn [{\n  json: {\n    subject: \"📊 Weekly HR Analytics Report\",\n    message: message\n  }\n}];"
+      },
+      "name": "Format Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "fromEmail": "admin@company.com",
+        "toEmail": "hr@company.com",
+        "subject": "={{ $json.subject }}",
+        "html": "={{ $json.message }}",
+        "options": {}
+      },
+      "name": "Send Report Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [850, 300]
+    }
+  ],
+  "connections": {
+    "Weekly Schedule": {
+      "main": [
+        [
+          {
+            "node": "Fetch Dashboard Stats",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Dashboard Stats": {
+      "main": [
+        [
+          {
+            "node": "Format Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Report": {
+      "main": [
+        [
+          {
+            "node": "Send Report Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

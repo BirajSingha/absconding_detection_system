@@ -1,292 +1,186 @@
 #!/usr/bin/env python3
 """
-MCP Server for Absconding Detection System
-
-This server exposes employee data, alerts, and analytics as MCP resources
-and provides tools for AI assistants to interact with the HR system.
+MCP Server for Candidate Interview Analysis System
+Provides tools and resources for absconding risk detection.
 """
 
 import asyncio
 import json
 from typing import Any
 from mcp.server import Server
-from mcp.types import Resource, Tool, TextContent, ImageContent, EmbeddedResource
+from mcp.types import Resource, Tool, TextContent
 from mcp.server.stdio import stdio_server
 import sys
 import os
 
-# Add parent directory to path to import app modules
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from app import create_app, db
-from app.models.employee import Employee, Alert
-from app.services.anomaly_detector import AnomalyDetector
-from app.services.sentiment_analyzer import SentimentAnalyzer
+from app.models.candidate import Candidate, InterviewAnalysis
+from app.services.llm_analyzer import LLMAnalyzer
 
-# Initialize Flask app context
 flask_app = create_app()
 app_context = flask_app.app_context()
 app_context.push()
 
-# Initialize services
-anomaly_detector = AnomalyDetector()
-sentiment_analyzer = SentimentAnalyzer()
+server = Server("candidate-analysis-system")
+llm_analyzer = LLMAnalyzer()
 
-# Create MCP server
-server = Server("absconding-detection-system")
+# Interview questions for MCP resource
+INTERVIEW_QUESTIONS = [
+    {"id": "q1", "text": "Why did you leave your last position?", "category": "job_stability"},
+    {"id": "q2", "text": "How many jobs have you had in the last 5 years?", "category": "job_stability"},
+    {"id": "q3", "text": "Where do you see yourself in 2 years?", "category": "commitment"},
+    {"id": "q4", "text": "What are your long-term career goals?", "category": "commitment"},
+    {"id": "q5", "text": "What would make you leave this role within the first year?", "category": "exit_intent"},
+    {"id": "q6", "text": "What are the top 3 things you look for in an employer?", "category": "exit_intent"},
+    {"id": "q7", "text": "How do you handle workplace conflicts?", "category": "behavioral"},
+    {"id": "q8", "text": "Describe a time you felt undervalued at work. How did you respond?", "category": "behavioral"},
+    {"id": "q9", "text": "If you received a better offer during probation, what would you do?", "category": "situational"},
+    {"id": "q10", "text": "What concerns do you have about this position?", "category": "situational"}
+]
 
 @server.list_resources()
 async def list_resources() -> list[Resource]:
-    """List available resources in the absconding detection system"""
     return [
         Resource(
-            uri="absconding://employees/list",
-            name="Employee List",
+            uri="candidates://list",
+            name="Candidate List",
             mimeType="application/json",
-            description="List of all employees with their current status and metrics"
+            description="List of all candidates and their statuses"
         ),
         Resource(
-            uri="absconding://alerts/active",
-            name="Active Alerts",
+            uri="analysis://recent",
+            name="Recent Analysis",
             mimeType="application/json",
-            description="Currently active high-risk alerts"
+            description="Recent interview analyses"
         ),
         Resource(
-            uri="absconding://analytics/risk-distribution",
-            name="Risk Distribution",
+            uri="interview://questions",
+            name="Interview Questions",
             mimeType="application/json",
-            description="Distribution of employees across risk levels"
+            description="Absconding risk detection interview questions"
         ),
         Resource(
-            uri="absconding://analytics/department-stats",
-            name="Department Statistics",
+            uri="candidates://high-risk",
+            name="High Risk Candidates",
             mimeType="application/json",
-            description="Risk and performance statistics by department"
+            description="Candidates with LOW fit category (high absconding risk)"
         )
     ]
 
 @server.read_resource()
 async def read_resource(uri: str) -> str:
-    """Read a specific resource"""
-    
-    if uri == "absconding://employees/list":
-        employees = Employee.query.all()
-        data = [emp.to_dict() for emp in employees]
+    if uri == "candidates://list":
+        candidates = Candidate.query.all()
+        data = [c.to_dict() for c in candidates]
         return json.dumps(data, indent=2)
-    
-    elif uri == "absconding://alerts/active":
-        alerts = Alert.query.filter(
-            Alert.status.in_(['OPEN', 'ACKNOWLEDGED']),
-            Alert.risk_level.in_(['HIGH', 'CRITICAL'])
-        ).order_by(Alert.risk_score.desc()).all()
-        
-        result = []
-        for alert in alerts:
-            employee = Employee.query.filter_by(employee_id=alert.employee_id).first()
-            result.append({
-                'alert': alert.to_dict(),
-                'employee': employee.to_dict() if employee else None
-            })
-        return json.dumps(result, indent=2)
-    
-    elif uri == "absconding://analytics/risk-distribution":
-        risk_counts = {
-            'CRITICAL': Alert.query.filter_by(risk_level='CRITICAL').count(),
-            'HIGH': Alert.query.filter_by(risk_level='HIGH').count(),
-            'MEDIUM': Alert.query.filter_by(risk_level='MEDIUM').count(),
-            'LOW': Alert.query.filter_by(risk_level='LOW').count()
-        }
-        return json.dumps(risk_counts, indent=2)
-    
-    elif uri == "absconding://analytics/department-stats":
-        from sqlalchemy import func
-        departments = db.session.query(
-            Employee.department,
-            func.count(Employee.id).label('total'),
-            func.avg(Employee.productivity_score).label('avg_productivity'),
-            func.avg(Employee.attendance_percentage).label('avg_attendance')
-        ).group_by(Employee.department).all()
-        
-        result = []
-        for dept in departments:
-            result.append({
-                'department': dept[0],
-                'total_employees': dept[1],
-                'avg_productivity': float(dept[2]) if dept[2] else 0,
-                'avg_attendance': float(dept[3]) if dept[3] else 0
-            })
-        return json.dumps(result, indent=2)
-    
+    elif uri == "analysis://recent":
+        analyses = InterviewAnalysis.query.order_by(InterviewAnalysis.created_at.desc()).limit(10).all()
+        data = [a.to_dict() for a in analyses]
+        return json.dumps(data, indent=2)
+    elif uri == "interview://questions":
+        return json.dumps(INTERVIEW_QUESTIONS, indent=2)
+    elif uri == "candidates://high-risk":
+        candidates = Candidate.query.filter_by(fit_category='LOW').all()
+        data = [c.to_dict() for c in candidates]
+        return json.dumps(data, indent=2)
     else:
         return json.dumps({"error": "Resource not found"})
 
 @server.list_tools()
 async def list_tools() -> list[Tool]:
-    """List available tools"""
     return [
         Tool(
-            name="analyze_employee_risk",
-            description="Analyze absconding risk for a specific employee",
+            name="get_candidate_fit",
+            description="Get fit score and analysis for a candidate",
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "employee_id": {
-                        "type": "string",
-                        "description": "Employee ID to analyze"
-                    }
+                    "candidate_id": {"type": "string"}
                 },
-                "required": ["employee_id"]
+                "required": ["candidate_id"]
             }
         ),
         Tool(
-            name="get_employee_details",
-            description="Get detailed information about an employee including recent alerts",
+            name="analyze_interview_response",
+            description="Analyze a candidate's interview response for absconding risk",
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "employee_id": {
-                        "type": "string",
-                        "description": "Employee ID to retrieve"
-                    }
+                    "candidate_id": {"type": "string", "description": "Candidate ID"},
+                    "question": {"type": "string", "description": "The interview question"},
+                    "answer": {"type": "string", "description": "Candidate's answer"}
                 },
-                "required": ["employee_id"]
+                "required": ["candidate_id", "question", "answer"]
             }
         ),
         Tool(
-            name="update_employee_metrics",
-            description="Update performance metrics for an employee",
+            name="get_high_risk_candidates",
+            description="Get list of candidates with high absconding risk",
             inputSchema={
                 "type": "object",
-                "properties": {
-                    "employee_id": {
-                        "type": "string",
-                        "description": "Employee ID"
-                    },
-                    "productivity_score": {
-                        "type": "number",
-                        "description": "Productivity score (0-100)"
-                    },
-                    "attendance_percentage": {
-                        "type": "number",
-                        "description": "Attendance percentage (0-100)"
-                    },
-                    "performance_rating": {
-                        "type": "number",
-                        "description": "Performance rating (0-4)"
-                    }
-                },
-                "required": ["employee_id"]
-            }
-        ),
-        Tool(
-            name="get_high_risk_employees",
-            description="Get list of employees currently at high risk of absconding",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "limit": {
-                        "type": "number",
-                        "description": "Maximum number of employees to return",
-                        "default": 10
-                    }
-                }
+                "properties": {},
+                "required": []
             }
         )
     ]
 
 @server.call_tool()
 async def call_tool(name: str, arguments: Any) -> list[TextContent]:
-    """Execute a tool"""
-    
-    if name == "analyze_employee_risk":
-        employee_id = arguments.get("employee_id")
-        employee = Employee.query.filter_by(employee_id=employee_id).first()
-        
-        if not employee:
-            return [TextContent(type="text", text=f"Employee {employee_id} not found")]
-        
-        # Detect anomalies
-        anomalies = anomaly_detector.detect_anomalies(employee_id)
-        risk_score = anomaly_detector.calculate_risk_score(anomalies)
+    if name == "get_candidate_fit":
+        candidate_id = arguments.get("candidate_id")
+        candidate = Candidate.query.filter_by(candidate_id=candidate_id).first()
+        if not candidate:
+            return [TextContent(type="text", text="Candidate not found")]
+            
+        analysis = InterviewAnalysis.query.filter_by(candidate_id=candidate_id).order_by(InterviewAnalysis.created_at.desc()).first()
         
         result = {
-            "employee_id": employee_id,
-            "employee_name": employee.name,
-            "department": employee.department,
-            "risk_score": risk_score,
-            "anomalies": anomalies,
-            "recommendation": "HIGH PRIORITY - Immediate intervention needed" if risk_score >= 60 else "Monitor closely"
+            "name": candidate.name,
+            "position": candidate.position_applied,
+            "fit_score": analysis.fit_score if analysis else "N/A",
+            "category": analysis.fit_category if analysis else "N/A",
+            "summary": analysis.ai_summary if analysis else "No analysis found",
+            "absconding_risk": "HIGH" if analysis and analysis.fit_category == "LOW" else "LOW"
         }
-        
         return [TextContent(type="text", text=json.dumps(result, indent=2))]
     
-    elif name == "get_employee_details":
-        employee_id = arguments.get("employee_id")
-        employee = Employee.query.filter_by(employee_id=employee_id).first()
+    elif name == "analyze_interview_response":
+        candidate_id = arguments.get("candidate_id")
+        question = arguments.get("question")
+        answer = arguments.get("answer")
         
-        if not employee:
-            return [TextContent(type="text", text=f"Employee {employee_id} not found")]
+        # Format and analyze
+        transcript = f"Q: {question}\nA: {answer}"
+        result = llm_analyzer.analyze_transcript(transcript, "General")
         
-        alerts = Alert.query.filter_by(employee_id=employee_id).order_by(Alert.created_at.desc()).limit(5).all()
-        
-        result = {
-            "employee": employee.to_dict(),
-            "recent_alerts": [alert.to_dict() for alert in alerts]
+        response = {
+            "candidate_id": candidate_id,
+            "fit_score": result["fit_score"],
+            "fit_category": result["fit_category"],
+            "tone": result["tone_analysis"],
+            "summary": result["ai_summary"],
+            "absconding_risk": "HIGH" if result["fit_category"] == "LOW" else "MODERATE" if result["fit_category"] == "MEDIUM" else "LOW"
         }
-        
+        return [TextContent(type="text", text=json.dumps(response, indent=2))]
+    
+    elif name == "get_high_risk_candidates":
+        candidates = Candidate.query.filter_by(fit_category='LOW').all()
+        result = [{
+            "id": c.candidate_id,
+            "name": c.name,
+            "position": c.position_applied,
+            "fit_score": c.fit_score,
+            "status": c.status
+        } for c in candidates]
         return [TextContent(type="text", text=json.dumps(result, indent=2))]
-    
-    elif name == "update_employee_metrics":
-        employee_id = arguments.get("employee_id")
-        employee = Employee.query.filter_by(employee_id=employee_id).first()
         
-        if not employee:
-            return [TextContent(type="text", text=f"Employee {employee_id} not found")]
-        
-        if "productivity_score" in arguments:
-            employee.productivity_score = arguments["productivity_score"]
-        if "attendance_percentage" in arguments:
-            employee.attendance_percentage = arguments["attendance_percentage"]
-        if "performance_rating" in arguments:
-            employee.performance_rating = arguments["performance_rating"]
-        
-        db.session.commit()
-        
-        return [TextContent(type="text", text=f"Updated metrics for {employee.name}")]
-    
-    elif name == "get_high_risk_employees":
-        limit = arguments.get("limit", 10)
-        
-        alerts = Alert.query.filter(
-            Alert.risk_level.in_(['HIGH', 'CRITICAL']),
-            Alert.status.in_(['OPEN', 'ACKNOWLEDGED'])
-        ).order_by(Alert.risk_score.desc()).limit(limit).all()
-        
-        result = []
-        for alert in alerts:
-            employee = Employee.query.filter_by(employee_id=alert.employee_id).first()
-            if employee:
-                result.append({
-                    "employee_id": employee.employee_id,
-                    "name": employee.name,
-                    "department": employee.department,
-                    "risk_score": alert.risk_score,
-                    "risk_level": alert.risk_level
-                })
-        
-        return [TextContent(type="text", text=json.dumps(result, indent=2))]
-    
-    else:
-        return [TextContent(type="text", text=f"Unknown tool: {name}")]
+    return [TextContent(type="text", text="Unknown tool")]
 
 async def main():
-    """Run the MCP server"""
     async with stdio_server() as (read_stream, write_stream):
-        await server.run(
-            read_stream,
-            write_stream,
-            server.create_initialization_options()
-        )
+        await server.run(read_stream, write_stream, server.create_initialization_options())
 
 if __name__ == "__main__":
     asyncio.run(main())

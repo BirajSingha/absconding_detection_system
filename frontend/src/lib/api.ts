@@ -1,4 +1,9 @@
-import { Alert, AnalyticsData, Employee, AlertSummary } from "./types";
+import {
+  InterviewAnalysis,
+  AnalyticsData,
+  Candidate,
+  AlertSummary,
+} from "./types";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
@@ -18,34 +23,37 @@ async function fetchAPI<T>(
 }
 
 export const api = {
-  employees: {
+  candidates: {
     list: async () => {
-      const res = await fetchAPI<{ employees: Employee[] }>("/employees");
-      return res.employees;
+      const res = await fetchAPI<Candidate[]>("/candidates");
+      return res; // Candidates endpoint now returns array directly
     },
-    get: (id: string) => fetchAPI<Employee>(`/employees/${id}`),
-  },
-  alerts: {
-    list: async (status?: string) => {
-      const res = await fetchAPI<{ alerts: Alert[] }>(
-        `/alerts${status ? `?status=${status}` : ""}`
-      );
-      return res.alerts;
-    },
-    get: (id: number) => fetchAPI<Alert>(`/alerts/${id}`),
-    updateStatus: (id: number, status: string) =>
-      fetchAPI<Alert>(`/alerts/${id}/status`, {
-        method: "PUT",
+    get: (id: string) => fetchAPI<Candidate>(`/candidates/${id}`),
+    create: (data: any) =>
+      fetchAPI<Candidate>("/candidates", {
+        method: "POST",
+        body: JSON.stringify(data),
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
       }),
+  },
+  analysis: {
+    analyze: (candidateId: string, transcript: string) =>
+      fetchAPI<InterviewAnalysis>("/analysis/analyze-interview", {
+        method: "POST",
+        body: JSON.stringify({
+          candidate_id: candidateId,
+          transcript_text: transcript,
+        }),
+        headers: { "Content-Type": "application/json" },
+      }),
+    getByCandidate: (candidateId: string) =>
+      fetchAPI<InterviewAnalysis[]>(`/analysis/candidate/${candidateId}`),
   },
   analytics: {
     getDashboardStats: () => fetchAPI<AnalyticsData>("/analytics/dashboard"),
-    getAlertTrends: () =>
-      fetchAPI<{ data: { date: string; count: number }[] }>(
-        "/analytics/alert-trends"
-      ),
-    getAlertSummary: () => fetchAPI<AlertSummary>("/analytics/alert-summary"),
+    getAlertSummary: async () => {
+      const res = await fetchAPI<AlertSummary>("/analytics/alert-summary");
+      return res;
+    },
   },
 };

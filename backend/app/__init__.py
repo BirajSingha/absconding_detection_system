@@ -21,9 +21,9 @@ def create_app():
     CORS(app)
     
     # Register blueprints
-    from app.routes import employees, alerts, analytics, vector_db, n8n_webhooks
-    app.register_blueprint(employees.bp)
-    app.register_blueprint(alerts.bp)
+    from app.routes import candidates, analysis, analytics, vector_db, n8n_webhooks
+    app.register_blueprint(candidates.bp)
+    app.register_blueprint(analysis.bp)
     app.register_blueprint(analytics.bp)
     app.register_blueprint(vector_db.bp)
     app.register_blueprint(n8n_webhooks.bp)
@@ -32,13 +32,13 @@ def create_app():
     with app.app_context():
         db.create_all()
         # Initialize Vector DB on startup
-        try:
-            from app.services.vector_store import get_vector_store
-            vector_store = get_vector_store()
-            stats = vector_store.get_collection_stats()
-            print(f"✓ Vector DB initialized")
-            print(f"  Collections: {stats}")
-        except Exception as e:
-            print(f"⚠️  Vector DB initialization warning: {e}")
+        # try:
+        #     from app.services.vector_store import get_vector_store
+        #     vector_store = get_vector_store()
+        #     stats = vector_store.get_collection_stats()
+        #     print(f"✓ Vector DB initialized")
+        #     print(f"  Collections: {stats}")
+        # except Exception as e:
+        #     print(f"⚠️  Vector DB initialization warning: {e}")
     
     return app

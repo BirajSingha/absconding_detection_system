@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { HeaderProvider } from "@/context/HeaderContext";
 
 export const metadata: Metadata = {
   title: "Absconding Detection System",
@@ -14,8 +15,13 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="bg-slate-50 text-slate-900 font-sans">
-        <AppLayout>{children}</AppLayout>
+      <body
+        className="bg-slate-50 text-slate-900 font-sans"
+        suppressHydrationWarning
+      >
+        <HeaderProvider>
+          <AppLayout>{children}</AppLayout>
+        </HeaderProvider>
       </body>
     </html>
   );

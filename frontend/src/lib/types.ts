@@ -1,51 +1,53 @@
-export interface Employee {
-  employee_id: string;
+export interface Candidate {
+  id: number;
+  candidate_id: string;
   name: string;
   email: string;
-  role: string;
+  phone: string;
+  position_applied: string;
   department: string;
-  tenure_years: number;
-  risk_score: number;
-  risk_level: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
-  attendance_percentage: number;
-  productivity_score: number;
-  performance_rating: number;
-  employment_status: string;
+  interview_date: string;
+  status: "PENDING" | "INTERVIEWED" | "HIRED" | "REJECTED";
+  fit_score: number;
+  fit_category: "LOW" | "MEDIUM" | "HIGH" | "EXCELLENT";
 }
 
-export interface Alert {
+export interface InterviewAnalysis {
   id: number;
-  employee_id: string;
-  employee_name: string;
-  risk_score: number;
-  risk_level: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
-  status: "OPEN" | "ACKNOWLEDGED" | "RESOLVED";
+  candidate_id: string;
+  fit_score: number;
+  fit_category: "LOW" | "MEDIUM" | "HIGH" | "EXCELLENT";
+  confidence_score: number;
+  tone_analysis: {
+    confidence: number;
+    nervousness: number;
+    professionalism: number;
+    tone_label: string;
+  };
+  behavioral_traits: Record<string, number>;
+  ai_summary: string;
+  recommendations: string[];
   created_at: string;
-  behavioral_indicators: (
-    | string
-    | { description: string; [key: string]: any }
-  )[];
-  sentiment_analysis: any;
 }
 
 export interface AnalyticsData {
-  risk_distribution: { name: string; value: number; color: string }[];
+  risk_distribution: { name: string; value: number; color: string }[]; // Keeping for now, maybe rename to 'fit_distribution' later
   department_risk: { name: string; high_risk_count: number }[];
-  top_risk_employees: Employee[];
-  recent_alerts: Alert[];
+  top_risk_employees: Candidate[]; // TODO: Rename on backend to top_candidates
+  recent_alerts: InterviewAnalysis[];
 }
 
 export interface AlertSummary {
-  total_employees: number;
-  total_alerts: number;
-  open_alerts: number;
-  resolved_alerts: number;
-  average_risk_score: number;
+  total_candidates: number;
+  total_interviews: number;
+  pending_interviews: number;
+  completed_interviews: number;
+  average_fit_score: number;
   status_breakdown: Record<string, number>;
   trends: {
-    employees: number;
-    at_risk: number;
-    resolved: number;
-    risk_score: number;
+    candidates: number;
+    fit_score: number;
+    resolved?: number;
+    at_risk?: number;
   };
 }

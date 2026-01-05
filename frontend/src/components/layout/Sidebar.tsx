@@ -14,9 +14,8 @@ import { cn } from "@/lib/utils";
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
-  { name: "Employees", href: "/employees", icon: Users },
-  { name: "Alerts", href: "/alerts", icon: Bell },
-  { name: "Analytics", href: "/analytics", icon: BarChart2 },
+  { name: "Candidates", href: "/candidates", icon: Users },
+  { name: "Analysis", href: "/analysis", icon: Bell },
 ];
 
 interface SidebarProps {
@@ -36,7 +35,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
         )}
       >
         <div className="flex h-16 items-center justify-between border-b border-slate-800 px-4 md:justify-center">
-          <h1 className="text-xl font-bold text-indigo-400">Retention AI</h1>
+          <h1 className="text-xl font-bold text-indigo-400">Absconding AI</h1>
           <button
             onClick={onClose}
             className="rounded-md p-1 text-slate-400 hover:bg-slate-800 hover:text-white md:hidden"
