@@ -15,7 +15,7 @@ class VectorDBConfig:
     
     # Validate credentials
     if not all([CHROMA_API_KEY, CHROMA_TENANT, CHROMA_DATABASE]):
-        print("⚠️  Warning: Chroma Cloud credentials not set. Vector DB will not be available.")
+        print("[WARN] Chroma Cloud credentials not set. Vector DB will run locally.")
         CHROMA_API_KEY = None
         CHROMA_TENANT = None
         CHROMA_DATABASE = None
@@ -29,10 +29,20 @@ def get_chroma_client():
     if _chroma_client is not None:
         return _chroma_client
     
-    # If credentials not set, return None (will use fallback in vector_store)
+    # If credentials not set, use local persistent client
     if not all([VectorDBConfig.CHROMA_API_KEY, VectorDBConfig.CHROMA_TENANT, VectorDBConfig.CHROMA_DATABASE]):
-        print("⚠️  Chroma Cloud not configured. Using local vector store fallback.")
-        return None
+        print("[WARN] Chroma Cloud not configured. Using local persistent storage.")
+        try:
+            # Create local storage directory
+            persist_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'data', 'chroma')
+            os.makedirs(persist_path, exist_ok=True)
+            
+            _chroma_client = chromadb.PersistentClient(path=persist_path)
+            print(f"[OK] Initialized local ChromaDB at {persist_path}")
+            return _chroma_client
+        except Exception as e:
+            print(f"[ERROR] Failed to initialize local ChromaDB: {e}")
+            return None
     
     try:
         _chroma_client = chromadb.CloudClient(
@@ -43,11 +53,18 @@ def get_chroma_client():
         
         # Test connection
         _chroma_client.heartbeat()
-        print("✓ Connected to Chroma Cloud successfully!")
+        print("[OK] Connected to Chroma Cloud successfully!")
         
         return _chroma_client
     
     except Exception as e:
-        print(f"⚠️  Could not connect to Chroma Cloud: {e}")
-        print("   Using local vector store fallback instead.")
-        return None
+        print(f"[WARN] Could not connect to Chroma Cloud: {e}")
+        print("       Falling back to local storage.")
+        try:
+            persist_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'data', 'chroma')
+            os.makedirs(persist_path, exist_ok=True)
+            _chroma_client = chromadb.PersistentClient(path=persist_path)
+            return _chroma_client
+        except Exception as local_e:
+             print(f"[ERROR] Failed to initialize local fallback: {local_e}")
+             return None

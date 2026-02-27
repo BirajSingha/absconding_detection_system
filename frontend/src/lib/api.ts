@@ -10,7 +10,7 @@ const API_BASE_URL =
 
 async function fetchAPI<T>(
   endpoint: string,
-  options?: RequestInit
+  options?: RequestInit,
 ): Promise<T> {
   const res = await fetch(`${API_BASE_URL}${endpoint}`, {
     cache: "no-store",
@@ -37,12 +37,17 @@ export const api = {
       }),
   },
   analysis: {
-    analyze: (candidateId: string, transcript: string) =>
+    analyze: (
+      candidateId: string,
+      transcript: string,
+      candidateName?: string,
+    ) =>
       fetchAPI<InterviewAnalysis>("/analysis/analyze-interview", {
         method: "POST",
         body: JSON.stringify({
           candidate_id: candidateId,
           transcript_text: transcript,
+          candidate_name: candidateName,
         }),
         headers: { "Content-Type": "application/json" },
       }),

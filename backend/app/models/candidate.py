@@ -1,6 +1,7 @@
 from app import db
 from datetime import datetime
 import json
+from werkzeug.security import generate_password_hash, check_password_hash
 
 class Candidate(db.Model):
     """Candidate model for tracking interview analysis"""
@@ -10,7 +11,11 @@ class Candidate(db.Model):
     candidate_id = db.Column(db.String(100), unique=True, nullable=False, index=True)
     name = db.Column(db.String(255), nullable=False)
     email = db.Column(db.String(255), unique=True)
+    password_hash = db.Column(db.String(255))
     phone = db.Column(db.String(20))
+    dob = db.Column(db.String(20))
+    current_role = db.Column(db.String(255))
+    total_experience = db.Column(db.String(50))
     position_applied = db.Column(db.String(255), nullable=False)
     department = db.Column(db.String(255), nullable=False)
     interview_date = db.Column(db.DateTime, default=datetime.utcnow)
@@ -19,10 +24,23 @@ class Candidate(db.Model):
     # Metadata
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Policy & Employment Data
+    joining_date = db.Column(db.Date, nullable=True)
+    probation_end_date = db.Column(db.Date, nullable=True)
+    notice_period_days = db.Column(db.Integer, default=60)
+    service_bond_active = db.Column(db.Boolean, default=True)
+    bond_penalty_amount = db.Column(db.Float, default=100000.0)
     
     # Relationships
     analyses = db.relationship('InterviewAnalysis', backref='candidate', lazy=True, cascade='all, delete-orphan')
     transcripts = db.relationship('TranscriptSegment', backref='candidate', lazy=True, cascade='all, delete-orphan')
+    
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
+        
+    def check_password(self, password):
+        return check_password_hash(self.password_hash, password)
     
     def to_dict(self):
         # Get latest analysis for fit score
@@ -36,6 +54,9 @@ class Candidate(db.Model):
             'name': self.name,
             'email': self.email,
             'phone': self.phone,
+            'dob': self.dob,
+            'current_role': self.current_role,
+            'total_experience': self.total_experience,
             'position_applied': self.position_applied,
             'department': self.department,
             'interview_date': self.interview_date.isoformat(),
@@ -131,3 +152,4 @@ class TranscriptSegment(db.Model):
     
     def __repr__(self):
         return f'<TranscriptSegment {self.id}: {self.candidate_id}>'
+

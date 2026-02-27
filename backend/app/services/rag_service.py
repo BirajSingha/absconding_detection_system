@@ -1,4 +1,4 @@
-from google import genai
+import google.generativeai as genai
 import os
 from app.services.vector_store import get_vector_store
 import json
@@ -8,11 +8,14 @@ class RAGService:
     
     def __init__(self):
         api_key = os.getenv('GEMINI_API_KEY')
-        self.client = genai.Client(api_key=api_key)
-        self.model_name = 'gemini-2.0-flash-lite-preview-02-05'
+        if not api_key:
+            print("[WARN] GEMINI_API_KEY not found in environment variables")
+        
+        genai.configure(api_key=api_key)
+        self.model = genai.GenerativeModel('gemini-flash-latest')
         self.vector_store = get_vector_store()
     
-    def analyze_risk(self, employee_data, anomalies, sentiment_data):
+    def analyze_risk(self, employee_data, anomalies, sentiment_data, previous_analysis=None):
         """Analyze risk using RAG with vector database"""
         
         # 1. Create query for similar cases
@@ -50,10 +53,7 @@ class RAGService:
         
         # 6. Get AI analysis
         try:
-            response = self.client.models.generate_content(
-                model=self.model_name,
-                contents=prompt
-            )
+            response = self.model.generate_content(prompt)
             response_text = response.text
             
             # Extract JSON from response
@@ -77,6 +77,42 @@ class RAGService:
             print(f"RAG Error: {e}")
             return self._fallback_analysis(anomalies, sentiment_data)
     
+    def generate_chat_response(self, message: str, history: list = []) -> str:
+        """Generate a response to a candidate's chat message using RAG"""
+        
+        try:
+            # 1. Search knowledge base for relevant FAQs/Policies
+            knowledge_docs = self.vector_store.search_knowledge(message, n_results=2)
+            
+            # 2. Build context
+            context = "\n".join([f"- {doc['content']}" for doc in knowledge_docs])
+            
+            # 3. Create prompt
+            prompt = f"""
+            You are a polite, neutral, and helpful HR Chatbot assisting a candidate.
+            Your goal is to answer the candidate's questions based ONLY on the following knowledge base context.
+            If the answer is not in the context, politely say you verify with the HR team.
+            Do NOT reveal that you are analyzing them for risk.
+            Keep the response concise (under 50 words) and professional.
+            
+            Knowledge Base Context:
+            {context}
+            
+            Candidate's Message: "{message}"
+            
+            Response:
+            """
+            
+            # 4. Generate content
+            response = self.model.generate_content(prompt)
+            return response.text.strip()
+            
+        except Exception as e:
+            with open("error_log.txt", "a") as f:
+                f.write(f"Chatbot Error: {str(e)}\n")
+            print(f"Chatbot Error: {e}")
+            return "I apologize, but I'm having trouble connecting to the system explicitly. I will note your query for the HR team."
+
     def _create_search_query(self, employee_data, anomalies, sentiment_data):
         """Create query for vector similarity search"""
         
@@ -112,9 +148,17 @@ class RAGService:
         
         return context
     
-    def _create_analysis_prompt(self, employee_data, anomalies, sentiment_data, 
-                                context, employee_comms):
-        """Create analysis prompt with context"""
+    def _create_analysis_prompt(self, employee_data, anomalies, sentiment_data, context, employee_comms, previous_analysis=None):
+        risk_factors = "\n".join([f"- {a['type']}: {a.get('change', a.get('drop', ''))}" for a in anomalies])
+        
+        prev_context_str = ""
+        if previous_analysis:
+            prev_context_str = f"""
+            ## PREVIOUS ANALYSIS (HISTORICAL CONTEXT)
+            - Previous Risk Level: {previous_analysis.get('risk_level', 'UNKNOWN')}
+            - Previous Checkpoints Summary: {previous_analysis.get('summary', 'None')}
+            - Evolution: Compare the current findings with this previous state. Has the candidate improved or deteriorated?
+            """
         
         comms_summary = "\n".join([
             f"- [{c['metadata'].get('source')}] {c['content'][:100]}..." 
@@ -129,8 +173,10 @@ class RAGService:
 - Department: {employee_data['department']}
 - Tenure: {employee_data['tenure_years']} years
 
+{prev_context_str}
+
 ## Behavioral Anomalies Detected:
-{json.dumps(anomalies, indent=2)}
+{risk_factors}
 
 ## Sentiment Analysis:
 {json.dumps(sentiment_data, indent=2)}

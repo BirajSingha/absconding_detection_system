@@ -1,4 +1,4 @@
-from google import genai
+# from google import genai  <-- Moved to local scope
 import os
 import json
 import logging
@@ -12,11 +12,12 @@ class LLMAnalyzer:
     def __init__(self):
         # Configure Gemini
         api_key = os.getenv('GEMINI_API_KEY')
+        from google import genai  # Lazy import
         if not api_key:
             logging.warning("GEMINI_API_KEY not found. LLMAnalyzer will fail.")
         else:
             self.client = genai.Client(api_key=api_key)
-            self.model_name = 'gemini-2.0-flash-lite-preview-02-05'
+            self.model_name = 'models/gemini-2.5-flash'
         
     def analyze_transcript(self, text, position):
         """
@@ -67,18 +68,26 @@ class LLMAnalyzer:
     def _create_analysis_prompt(self, text, position):
         return f"""
         You are an Expert Interview Psychologist and HR Data Analyst. 
-        Analyze the following interview transcript for a candidate applying for the position of "{position}".
+        Analyze the following Chatbot Conversation Transcript between a candidate and an AI HR Assistant.
+        Position: "{position}".
         
         Transcript:
         "{text}"
         
         Your goal is to evaluate the candidate's psychological profile, specifically focusing on "Absconding Risk" (likelihood of leaving abruptly).
+        The candidate believes they are just asking HR queries, so their guard is down.
         
-        CRITICAL INSTRUCTION: Do not rely solely on keywords. specificially analyze:
-        1. The *way* the message is conveyed (Tone, Subtext, Defensiveness).
-        2. Inconsistencies or evasiveness in their narrative.
-        3. Subtle signs of dissatisfaction or lack of commitment.
-        4. "Resignation" or "Ignored" mentions should be analyzed in context (e.g. was it a valid reason or a pattern of quitting?).
+        CRITICAL INSTRUCTION: Analyze IMPLICIT SIGNALS from the conversation:
+        1. Repeated clarification on "Joining Date" or "Notice Period" -> May imply holding other offers (High Risk).
+        2. Questions about "Bond breaking", "Exit process", or "Moonlighting" -> High Risk of absconding/moonlighting.
+        3. Excessive focus on "Perks/Benefits/Leaves" vs "Role/Responsibilities" -> Transactional mindset.
+        4. Hesitation or postponement language -> Possible counter-offer negotiation.
+        5. Tone: Impatient, demanding, or evasive vs. Professional and inquiring.
+        
+        Map these implicit signals to the exact same dimensions as a structured interview:
+        - Stability: Does the candidate seem settled or looking for a quick switch?
+        - Commitment: Are they asking about long-term growth or short-term gains?
+        - Exit Intent: Are they already planning their exit?
         
         Provide the output EXCLUSIVELY as a valid JSON object with the following structure:
         {{
@@ -98,7 +107,7 @@ class LLMAnalyzer:
                 "commitment": <float 1-10>,
                 "stability": <float 1-10>
             }},
-            "ai_summary": "<One sentence summary of the candidate's profile and risk level>",
+            "ai_summary": "<One sentence summary of the candidate's profile and risk level based on chat signals>",
             "recommendations": ["<Rec 1>", "<Rec 2>", "<Rec 3>"]
         }}
         """

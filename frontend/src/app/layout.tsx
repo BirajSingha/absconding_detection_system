@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { AppLayout } from "@/components/layout/AppLayout";
-import { HeaderProvider } from "@/context/HeaderContext";
+import { AuthProvider } from "@/context/AuthContext";
 
 export const metadata: Metadata = {
   title: "Absconding Detection System",
@@ -19,9 +18,9 @@ export default function RootLayout({
         className="bg-slate-50 text-slate-900 font-sans"
         suppressHydrationWarning
       >
-        <HeaderProvider>
-          <AppLayout>{children}</AppLayout>
-        </HeaderProvider>
+        <AuthProvider>
+          <main className="min-h-screen">{children}</main>
+        </AuthProvider>
       </body>
     </html>
   );

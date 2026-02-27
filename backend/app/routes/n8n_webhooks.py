@@ -8,7 +8,12 @@ from datetime import datetime
 
 bp = Blueprint('n8n_webhooks', __name__, url_prefix='/api/webhooks/n8n')
 
-llm_analyzer = LLMAnalyzer()
+llm_analyzer = None
+def get_llm_analyzer():
+    global llm_analyzer
+    if not llm_analyzer:
+        llm_analyzer = LLMAnalyzer()
+    return llm_analyzer
 
 # Webhook secret for security (optional but recommended)
 WEBHOOK_SECRET = "n8n_webhook_secret_key"  # Should be in .env
@@ -53,7 +58,7 @@ def analyze_candidate():
     transcript_text = data.get('transcript_text', '')
     position = data.get('position', candidate.position_applied)
     
-    analysis_result = llm_analyzer.analyze_transcript(transcript_text, position)
+    analysis_result = get_llm_analyzer().analyze_transcript(transcript_text, position)
     
     # Check for Alert Conditions (Low fit or specific sentiment flags)
     should_alert = False

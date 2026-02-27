@@ -21,12 +21,14 @@ def create_app():
     CORS(app)
     
     # Register blueprints
-    from app.routes import candidates, analysis, analytics, vector_db, n8n_webhooks
+    from app.routes import candidates, analysis, analytics, vector_db, n8n_webhooks, chat, auth
     app.register_blueprint(candidates.bp)
     app.register_blueprint(analysis.bp)
     app.register_blueprint(analytics.bp)
     app.register_blueprint(vector_db.bp)
     app.register_blueprint(n8n_webhooks.bp)
+    app.register_blueprint(chat.bp)
+    app.register_blueprint(auth.bp)
     
     # Create tables
     with app.app_context():

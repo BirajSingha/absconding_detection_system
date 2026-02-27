@@ -3,7 +3,7 @@ export interface Candidate {
   candidate_id: string;
   name: string;
   email: string;
-  phone: string;
+  phone?: string | null;
   position_applied: string;
   department: string;
   interview_date: string;

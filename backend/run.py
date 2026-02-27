@@ -1,10 +1,10 @@
 from app import create_app
 import sys
 
-print("Initializing app...")
+print("Initializing app...", flush=True)
 try:
     app = create_app()
-    print("App initialized.")
+    print("App initialized.", flush=True)
 except Exception as e:
     print(f"Error initializing app: {e}")
     sys.exit(1)

@@ -59,80 +59,74 @@ def seed_all(vector_store=None):
         metadata={"description": "HR policies and retention strategies"}
     )
 
-    # Add knowledge documents
+    # Add knowledge documents - REPLACED for Chatbot FAQ
     knowledge_docs = [
         {
-            'id': 'policy_exit_indicators',
+            'id': 'faq_offer_details',
             'content': """
-            Common Exit Indicators in Employees:
+            Offer Letter & Joining Details:
             
-            1. Behavioral Changes:
-               - Sudden drop in productivity (>30%)
-               - Increased absenteeism or tardiness
-               - Withdrawal from team activities
-               
-            2. Communication Patterns:
-               - Negative sentiment in emails
-               - Reduced meeting participation
-               - Complaints about management
-               
-            3. Statistical Patterns:
-               - 80% of absconding cases show attendance issues
-               - 65% have negative sentiment
-               - 90% have productivity drops >30%
+            1. Offer Validity: 7 days from the date of issuance.
+            2. Joining Date: Mutual agreement, typically within 30-45 days.
+            3. Extension Policy: One-time extension of up to 1 week allowed with valid reason.
+            4. Relocation: Company provides relocation assistance (up to $2000) for >50 miles.
+            5. Documents Required: ID Proof, Previous Relieving Letter, Education Certificates.
             """,
             'metadata': {
-                'category': 'exit_indicators',
-                'source': 'HR_Research_2023'
+                'category': 'offer_details',
+                'source': 'HR_Offer_Policy_2024'
             }
         },
         {
-            'id': 'policy_retention_strategies',
+            'id': 'faq_benefits',
             'content': """
-            Proven Employee Retention Strategies:
+            Employee Benefits & Perks:
             
-            1. Compensation Adjustment (85% success rate)
-               - Market salary review within 48 hours
-               - Consider 10-15% increase for high performers
-               
-            2. Career Development (78% success rate)
-               - Create clear promotion path
-               - Assign mentor/coach
-               - Provide training opportunities
-               
-            3. Flexible Work Arrangements (72% success rate)
-               - Remote work options
-               - Flexible hours
-               - Work-life balance support
+            1. Health Insurance: Comprehensive coverage for self + family.
+            2. Leave Policy: 20 Earned Leaves, 12 Sick Leaves, 10 Public Holidays.
+            3. Remote Policy: Hybrid model (3 days office, 2 days home).
+            4. Learning Budget: $500 per year for certifications/courses.
+            5. Wellness: Gym reimbursement and mental health support.
             """,
             'metadata': {
-                'category': 'retention_strategies',
-                'source': 'HR_Best_Practices_2023'
+                'category': 'benefits',
+                'source': 'HR_Benefits_Guide_2024'
             }
         },
         {
-            'id': 'policy_intervention_timeline',
+            'id': 'faq_onboarding',
             'content': """
-            Intervention Timeline Guidelines:
+            Onboarding Process (Day 1):
             
-            CRITICAL Risk (80%+ probability):
-            - Response Time: Within 24 hours
-            - Actions: Immediate HR meeting, compensation review
-            - Success Rate: 70% if acted within 24 hours
-            
-            HIGH Risk (60-79% probability):
-            - Response Time: Within 48 hours
-            - Actions: Manager check-in, career discussion
-            - Success Rate: 75% with proper intervention
+            1. Reporting Time: 9:30 AM at Reception.
+            2. IT Setup: Laptop and access cards provided on arrival.
+            3. Orientation: HR Induction 10:00 AM - 1:00 PM.
+            4. Team Intro: Lunch with the team at 1:00 PM.
+            5. Buddy System: A mentor will be assigned for the first 30 days.
             """,
             'metadata': {
-                'category': 'intervention_timeline',
-                'source': 'HR_Operations_Manual'
+                'category': 'onboarding',
+                'source': 'HR_Onboarding_Manual'
+            }
+        },
+        {
+            'id': 'faq_probation',
+            'content': """
+            Probation & Notice Period:
+            
+            1. Probation Period: 6 months standard.
+            2. Confirmation: Performance review at 5.5 months.
+            3. Notice Period (Probation): 15 days from either side.
+            4. Notice Period (Confirmed): 2 months.
+            """,
+            'metadata': {
+                'category': 'policies',
+                'source': 'HR_Policy_Handbook'
             }
         }
     ]
 
-    print(f"Adding {len(knowledge_docs)} knowledge documents...")
+    print(f"Adding {len(knowledge_docs)} knowledge documents (FAQs)...")
     for doc in knowledge_docs:
         knowledge_collection.add(
             documents=[doc['content']],

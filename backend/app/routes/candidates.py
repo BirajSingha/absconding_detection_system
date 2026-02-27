@@ -21,11 +21,14 @@ def create_candidate():
         candidate_id=data['candidate_id'],
         name=data['name'],
         email=data.get('email'),
-        phone=data.get('phone'),
+        phone=data.get('phone') or None,
         position_applied=data.get('position_applied'),
         department=data.get('department'),
         status='PENDING'
     )
+    
+    if 'password' in data:
+        candidate.set_password(data['password'])
     
     db.session.add(candidate)
     db.session.commit()

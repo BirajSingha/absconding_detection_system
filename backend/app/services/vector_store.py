@@ -16,11 +16,9 @@ class VectorStore:
         self.is_available = self.client is not None
         
         if self.is_available:
-            print("🌐 Using Chroma Cloud (hosted)")
-            print(f"   Tenant: {os.getenv('CHROMA_TENANT')}")
-            print(f"   Database: {os.getenv('CHROMA_DATABASE')}")
+            print("[INFO] Vector Store Client initialized", flush=True)
         else:
-            print("⚠️  Chroma Cloud unavailable - Using in-memory storage fallback")
+            print("[WARN] Vector Store unavailable - Using in-memory storage fallback", flush=True)
             self.in_memory_docs = {}  # Fallback storage
         
         # Use sentence-transformers for embeddings (FREE & fast)
@@ -49,14 +47,14 @@ class VectorStore:
                 name="hr_knowledge_base",
                 embedding_function=self.embedding_function
             )
-            print("   ✓ Connected to 'hr_knowledge_base' collection")
+            print("   [OK] Connected to 'hr_knowledge_base' collection")
         except:
             self.knowledge_collection = self.client.create_collection(
                 name="hr_knowledge_base",
                 embedding_function=self.embedding_function,
                 metadata={"description": "HR policies, retention strategies, and best practices"}
             )
-            print("   ✓ Created 'hr_knowledge_base' collection")
+            print("   [OK] Created 'hr_knowledge_base' collection")
         
         # Collection 2: Historical Cases
         try:
@@ -64,14 +62,14 @@ class VectorStore:
                 name="historical_cases",
                 embedding_function=self.embedding_function
             )
-            print("   ✓ Connected to 'historical_cases' collection")
+            print("   [OK] Connected to 'historical_cases' collection")
         except:
             self.cases_collection = self.client.create_collection(
                 name="historical_cases",
                 embedding_function=self.embedding_function,
                 metadata={"description": "Past absconding cases and outcomes"}
             )
-            print("   ✓ Created 'historical_cases' collection")
+            print("   [OK] Created 'historical_cases' collection")
         
         # Collection 3: Employee Communications
         try:
@@ -79,14 +77,14 @@ class VectorStore:
                 name="employee_communications",
                 embedding_function=self.embedding_function
             )
-            print("   ✓ Connected to 'employee_communications' collection")
+            print("   [OK] Connected to 'employee_communications' collection")
         except:
             self.communications_collection = self.client.create_collection(
                 name="employee_communications",
                 embedding_function=self.embedding_function,
                 metadata={"description": "Employee email and chat history"}
             )
-            print("   ✓ Created 'employee_communications' collection")
+            print("   [OK] Created 'employee_communications' collection")
     
     # Rest of the methods remain the same...
     # (Keep all other methods from the previous vector_store.py)
